@@ -14,8 +14,8 @@
 // FileSummary: NURBS and B-spline curves and surfaces.
 //////////////////////////////////////////////////////////////////////
 
-include<BOSL2/std.scad>
-include<BOSL2/beziers.scad>
+include<std.scad>
+include<beziers.scad>
 
 // Section: NURBS Curves
 
