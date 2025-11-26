@@ -125,5 +125,34 @@ and skew them. Therefore if you call `scale(10)` then scale will work similarly 
 will set the transformation matrix to scale the given amount and then call the children.
 
 
+## Diffing
 
+        filter( tag!= keep && tag != remove) children();
+To produce its output, diff() forms the union of all the base objects and then subtracts all the objects 
+with tags in remove. Finally it adds in objects listed in keep. Attachable objects should be tagged using tag() and non-attachable objects with force_tag().
+```
+diff()
+
+union() {
+    difference() {
+        filter( tag!= keep && tag != remove) children();
+        filter( tag == remove) children();
+    }
+    filter( tag == keep) children();
+}
+```
+
+## Intersect
+
+ This module treats the children in three groups: objects matching the intersect tags, objects matching the tags listed in keep and the remaining objects that don't match any listed tags. The intersection is computed between the union of the intersect tagged objects and the union of the objects that don't match any listed tags. Finally the objects listed in keep are union ed with the result.
+```
+union() {
+    intersection() {
+        filter( tag == intersect ) children();
+        filter( tag != intersect && tag != keep ) children();
+    }
+    filter( tag == keep ) children();
+}
+
+```
 
