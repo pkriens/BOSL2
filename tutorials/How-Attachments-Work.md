@@ -1,6 +1,135 @@
 # Attachments
 
 ## Introduction
+
+When you design 3D parts then it is not to hard to make one of the _primitive_ shapes: a cube, a sphere, a cylinder, etc. that he OpenSCAD language has as built-in _modules_. You can then use _operators_ to position these shapes relative to each other and other operators to subtract, intersect, or add shapes. One of the great advantages of OpenSCAD is that it is actually incredibly easy to get started. Few forget the thrill of their first 3D model in OpenSCAD after copy and pasting a few lines.
+
+However, life is surprisingly complex and most interesting 3D _models_ are are non-trivial. Their complexity gets multiplied if you want them to have soft edges and when you also want to properly parameterize them their complexity easily gets squared.
+
+The standard computer science solution to complexity is _modularity_. Modularity encapsulates local details and provides a way to handle them as a whole. The goal is to make it easier to combine these modules in many different situations without having to worry about their local details. 
+
+In this tutorial we call these modules _components_. A component is an OpenSCAD _module_ that is designed to be easy to assemble in _composites_, where a composite consists of an _assembly_ of other components or composites and is in itself a component. This is a recursive model.
+
+To make components work it is crucial that:
+
+* modules can hide their inner details, and 
+* be oblivious about what components uses them and how they are used. 
+
+A component can specify _parameters_ since it is an OpenSCAD module; a parent component should be able to fully assemble the component through these parameters. However, the parent component must also set the _context_ for the child component before it calls its the OpenSCAD module. 
+
+Clearly the 3D transformation (the position, scale, and rotation) is the primary aspect of the context. However, in OpenSCAD we need to standardize quite a bit of variables in the context because the language has no _state_ nor can a module return any value when called. That is, no information can flow from child to parent. Zero, nada. 
+
+For example, if you want to place several components next to each other you need to know their _bounding box_. However, there is _no_ way to get this information from the component itself. Not being able to _adapt_ to the shape of a child component would make any component model infeasable.
+
+BOSL2 found a (partial) solution by specifying the intent and then delegating the caclulation of the transformation matrix to a point where the child component's geometry is known. Using this geometry and the geometry of the parent you can position a component for example with the LEFT sides aligned since you know exactly how wide the parent and the child are. 
+
+If you think this sounds complex then you're on the right way to understanding it because it is complex, made even more complex because it has to work around some of OpenSCAD's severe limitations. In BOSL2 it is called the attachment model.
+
+However complex this solution is, it is relatively easy to use once you get familiar with the patterns. In this tutorial we will start at the absolute basics and progress to making 3D models out of advanced components.
+
+## Anchors
+
+Invoking `%cube(10)` renders a cube of 10mm on all sides, the percent sign makes it transparent:
+```
+include <BOSL2/std.scad>
+%cube(10);
+```
+<img width="417" height="338" alt="image" src="https://github.com/user-attachments/assets/680c8ab7-3cb2-46e6-bda0-9b93111cc4d9" />
+
+The first thing noticeable is that the cube is not _centered_ around the _origin_ but that the origin is aligned with the LEFT BOTTOM FRONT corner. In virtually all cases life is easier when shapes are centered around the origin because it makes the shape symmetric and that tends to simplify the operations because there are no preferential directions, all axis are treated evenly. The OpenSCAD designers must have realized this because they added a `center=true|false` attribute.
+```
+include <BOSL2/std.scad>
+%cube(10,center=true);
+```
+<img width="443" height="371" alt="image" src="https://github.com/user-attachments/assets/d476f9ab-30d8-41f1-8211-0878a11a041e" />
+
+This is a bit of a kludge and one of the reasons BOSL2 added a `cuboid()` module that is centered by default. However, what if we'd like to align the origin with the LEFT BOTTOM FRONT corner? 
+
+Every shape consists of _faces_, _edges_ where faces meet and _corners_ where the edges meet. A simple cube has six faces (think of the faces of a dice), 12 edges and 8 corners. All in all 26 positions. Trying to position over this many parts with booleans, as in `center=true`, would become prohibitively cumbersome.
+
+The solution to be able to navigate this space was _anchors_. An anchor is a _named_ position on a shape and all BOSL2 shapes, which includes all the OpenSCAD primitive shapes, have anchors for the common positions like LEFT, RIGHT, FRONT, BOTTOM, TOP, etc. The reason I use upper cased names is that they are actually constants for these names in BOSL2.
+
+Each BOSL2 has an `anchor` parameter that can be set to the name of the anchor we want the origin on. For example, if we want the cube to be positioned on the center of the BOTTOM face we can specify this as follows
+```
+include <BOSL2/std.scad>
+%cube(10, anchor=BOTTOM);
+```
+<img width="442" height="373" alt="image" src="https://github.com/user-attachments/assets/9946ad7a-203f-4347-9c4e-31cbfc3500ac" />
+
+Interestingly, we can combine the anchor 'names' to specify edges (where faces meet):
+
+```
+include <BOSL2/std.scad>
+%cube(10, anchor=BOTTOM+LEFT);
+```
+<img width="508" height="373" alt="image" src="https://github.com/user-attachments/assets/12c88293-1923-4c07-a262-15bc7f13c1f4" />
+
+And I guess it is obvious that we can also specify a corner (where edges meet).
+```
+include <BOSL2/std.scad>
+%cube(10, anchor=BOTTOM+LEFT+FRONT);
+```
+<img width="449" height="349" alt="image" src="https://github.com/user-attachments/assets/0079e4c3-c23a-4abc-830a-197312f34bee" />
+
+
+
+
+## Attach
+
+Since we have anchors it follows that we should be able to position components relative to each other using these anchors. The _attach()_ operator takes care of that.
+```
+include <BOSL2/std.scad>
+%cuboid(10)
+attach(TOP,BOTTOM) cube(5)
+;
+```
+<img width="356" height="334" alt="image" src="https://github.com/user-attachments/assets/05d77e31-61f7-488b-87d8-5154ae90278f" />
+
+
+
+
+
+
+
+
+Clearly the cube is a wonderful and useful shape but a tad limited in its utility. When you want to get some useful work done you likely have to combine different shapes and _transform_ them to the right _position_ and maybe adjust their _rotation_ and _scale_. For example, if you want a smaller cube on top of another cube you could use the _translate_ operator:
+```
+cube(10);
+translate([2.5,2.5,10]) cube(5);
+```
+<img width="256" height="256" alt="image" src="https://github.com/user-attachments/assets/176f67b2-a44b-40e2-a667-ff2b8ac8c729" />
+
+Depending on your experience level your reaction will vary from puzzlement to horror. A novice will have to think deep where on earth the 2.5 came from and why is the last parameter 10? Why isn't it symmetric. An experienced software expert will shudder when he realises how deep the violation of the law of DNRY (Do Not Repeat Yourself) is. This might work for trival examples but there is a special place in hell for developers that force you to look at such designs.
+
+So how can we do better? 
+
+In the previous example we have 2 independent _statements_. The first statement is the large cube and the second has the translate operator that sets the current transformation for the smaller cube. However, in OpenSCAD a module can also take a child module. We could also remove the first semicolon (';') and concatenate the modules.
+```
+cube(10)
+translate([-2.5,-2.5,5]) cube(5);
+```
+At first sight, we did not seem to made 
+
+
+The first observation is that the box is kind of awkwardly positioned with the LEFT+BOTTOM corner on the _origin_, position [0,0,0]. This is _asymmetric_. Asymmetric usually spells trouble in software because it means you have to think of many cases instead of one. In general, designing is easier when you center around the origin. The OpenSCAD designers also realized this afterwards because we can actually center the cube so the the CENTER of the cube is at the origin. 
+```
+cube(10, center=true);
+translate([0,0,7.5]) cube(5, center=true);
+```
+<img width="256" height="256" alt="image" src="https://github.com/user-attachments/assets/21c2f7c1-c781-4e31-b25e-fa2fcb5a0c3f" />
+
+Centering the origin is so obvious that in BOSL they made it the standard and added alternatives for the primitive shapes so you do not have to add the `center=true` attribute. For cube, this is `cuboid()`.
+
+
+
+At least we've got rid of the funny 2.5 but we're still stuck with the 7.5. Clearly this is functional since we place the small cube on top of the little cube so an offset of the sum of half both cubes at least makes some logical sense.
+
+One of the golden rules in software is to think _relative_. 
+
+In OpenSCAD the transformations are also _modules_. A module is the OpenSCAD name for a procedure with one or more _child_ modules. For example, the `translation()` module will change the current transformation matrix 
+
+To build more complex _composites_ you need to position these primitives 
+
 Attachments in BOSL2 provide positioning relative to other parent objects. For example, you can position a cube on a cube.
 
 <img width="256" height="256" alt="image" src="https://github.com/user-attachments/assets/0d34e604-41c1-4774-b9d1-21d02c0f1f63" />
